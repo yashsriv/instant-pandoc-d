@@ -15,11 +15,12 @@
     }
     #con-error {
       position: fixed;
-      top: 0px;
-      right: 0px;
+      top: 50vh;
+      right: 50vh;
       padding: 5px;
       background: white;
       color: red;
+      font-size: 2em;
     }
   </style>
   <script src="/node_modules/socket.io-client/socket.io.js"></script>
@@ -57,13 +58,14 @@
     }
 
     function setDisconnected(isDisconnected) {
+      document.getElementById('wrapper').style.display = isDisconnected ? 'none' : 'block';
       document.getElementById('con-error').style.display =
         isDisconnected ? 'block' : 'none';
     }
   </script>
 </head>
 <body>
-  <div class="wrapper">
+  <div id="wrapper" class="wrapper">
     <div class="container">
       <div class="repository-with-sidebar repo-container new-discussion-timeline with-full-navigation">
         <div id="js-repo-pjax-container" class="repository-content context-loader-container">
