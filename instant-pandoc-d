@@ -30,20 +30,28 @@ if (process.env.INSTANT_PANDOC_OPEN_TO_THE_WORLD) {
 var lastWritten = '';
 var args = '-f markdown -t html5';
 
-var welcome ='# Welcome to Instant Pandoc Daemon';
-welcome += '\nI am waiting for your plugin to send some data.\n';
-welcome += 'If you are using vim, check out [https://github.com/yashsriv/vim-instant-pandoc](https://github.com/vim-instant-pandoc)';
-
-pandoc(welcome, args, function(err, result) {
-  if (err) lastWritten = "An Error Occurred: " + err;
-  lastWritten = result;
-  io.sockets.emit('newContent', lastWritten);
-});
-
+function generateInit() {
+  var welcome = '# Welcome to Instant Pandoc Daemon';
+  welcome += '\nI am waiting for your plugin to send some data.\n';
+  welcome += 'If you are using vim, check out [https://github.com/yashsriv/vim-instant-pandoc](https://github.com/vim-instant-pandoc)';
+  pandoc(welcome, args, function(err, result) {
+    if (err) {
+      lastWritten = "An Error Occurred: " + err;
+      io.sockets.emit('newContent', lastWritten);
+      return;
+    }
+    lastWritten = result;
+    io.sockets.emit('newContent', lastWritten);
+  });
+}
 
 function writePandoc(body) {
   pandoc(body, args, function(err, result) {
-    if (err) lastWritten = "An Error Occurred: " + err;
+    if (err) {
+      lastWritten = "An Error Occurred: " + err;
+      io.sockets.emit('newContent', lastWritten);
+      return;
+    }
     lastWritten = result;
     io.sockets.emit('newContent', lastWritten);
   });
@@ -97,7 +105,6 @@ function httpHandler(req, res) {
   switch(req.method)
   {
     case 'GET':
-      console.log("GET: " + req.url);
       if(fs.existsSync(__dirname + req.url)) {
         var isIndexFile = /^\/(index\.html)?(\?|$)/.test(req.url);
         addSecurityHeaders(req, res, isIndexFile);
@@ -147,6 +154,7 @@ function onListening() {
   } else { // assume unix/linux
     exec('xdg-open http://localhost:' + options.port, function(error, stdout, stderr){});
   }
+  generateInit();
   readAllInput(process.stdin, function(body) {
     writeMarkdown(body);
   });
