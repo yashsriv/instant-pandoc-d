@@ -1,0 +1,177 @@
+#!/usr/bin/env node
+
+var exec = require('child_process').exec;
+var fs = require('fs');
+var os = require('os');
+var server = require('http').createServer(httpHandler);
+
+var io = require('socket.io').listen(server);
+var pandoc = require('node-pandoc');
+var send = require('send');
+var commandLineArgs = require('command-line-args');
+
+var optionDefinitions = [
+  { name: 'port', alias: 'p', type: Number, defaultValue: 8090 }
+];
+
+var options = commandLineArgs(optionDefinitions);
+
+// WARNING: By setting this environment variable, anyone on your network may
+// run arbitrary code in your browser and read arbitrary files in the working
+// directory of the open file!
+if (process.env.INSTANT_PANDOC_OPEN_TO_THE_WORLD) {
+  // Listen on any interface.
+  server.listen(options.port, onListening).once('error', onServerError);
+} else {
+  // Listen locally.
+  server.listen(options.port, '127.0.0.1', onListening).once('error', onServerError);
+}
+
+var lastWritten = '';
+var args = '-f markdown -t html5';
+
+var welcome ='# Welcome to Instant Pandoc Daemon';
+welcome += '\nI am waiting for your plugin to send some data.\n';
+welcome += 'If you are using vim, check out [https://github.com/yashsriv/vim-instant-pandoc](https://github.com/vim-instant-pandoc)';
+
+pandoc(welcome, args, function(err, result) {
+  if (err) lastWritten = "An Error Occurred: " + err;
+  lastWritten = result;
+  io.sockets.emit('newContent', lastWritten);
+});
+
+
+function writePandoc(body) {
+  pandoc(body, args, function(err, result) {
+    if (err) lastWritten = "An Error Occurred: " + err;
+    lastWritten = result;
+    io.sockets.emit('newContent', lastWritten);
+  });
+}
+
+function readAllInput(input, callback) {
+  var body = '';
+  input.on('data', function(data) {
+    body += data;
+    if (body.length > 1e6) {
+      throw new Error('The request body is too long.');
+    }
+  });
+  input.on('end', function() {
+    callback(body);
+  });
+}
+
+function addSecurityHeaders(req, res, isIndexFile) {
+  var csp = [];
+
+  // Cannot use 'self' because Chrome does not treat 'self' as http://host
+  // when the sandbox directive is set.
+  var HTTP_HOST = req.headers.host || ('localhost:' + options.port);
+  var CSP_SELF = 'http://' + HTTP_HOST;
+
+  if (!process.env.INSTANT_PANDOC_ALLOW_UNSAFE_CONTENT) {
+    if (isIndexFile) {
+      // index.html will drop the scripting capabilities upon load.
+      csp.push('script-src ' + CSP_SELF + " 'unsafe-inline'");
+      csp.push('sandbox allow-scripts allow-modals allow-forms');
+    } else {
+      csp.push('script-src ');
+    }
+  }
+  if (process.env.INSTANT_PANDOC_BLOCK_EXTERNAL) {
+    csp.push('default-src data: ' + CSP_SELF);
+    csp.push("style-src data: 'unsafe-inline' " + CSP_SELF);
+    csp.push('connect-src ' + CSP_SELF + ' ws://' + HTTP_HOST);
+  }
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Security-Policy', csp.join('; '));
+  if (isIndexFile) {
+    // Never cache the index file, to make sure that changes to the CSP are
+    // picked up across soft reloads.
+    res.setHeader('Cache-Control', 'no-store');
+  }
+}
+
+function httpHandler(req, res) {
+  switch(req.method)
+  {
+    case 'GET':
+      if(fs.existsSync(__dirname + req.url)) {
+        var isIndexFile = /^\/(index\.html)?(\?|$)/.test(req.url);
+        addSecurityHeaders(req, res, isIndexFile);
+        // Otherwise serve the file from the directory this module is in
+        send(req, req.url)
+          .root(__dirname)
+          .pipe(res);
+      }
+      // Example: /my-repo/raw/master/sub-dir/some.png
+      var githubUrl = req.url.match(/\/[^\/]+\/raw\/[^\/]+\/(.+)/);
+      if (githubUrl) {
+        addSecurityHeaders(req, res, false);
+         // Serve the file out of the current working directory
+        send(req, githubUrl[1])
+         .root(process.cwd())
+         .pipe(res);
+        return;
+      }
+
+      break;
+
+    case 'DELETE':
+      io.sockets.emit('die');
+      res.writeHead(200);
+      res.end();
+      process.exit();
+      break;
+
+    case 'PUT':
+      readAllInput(req, writePandoc);
+      res.writeHead(200);
+      res.end();
+      break;
+
+    default:
+  }
+}
+
+io.sockets.on('connection', function(sock){
+  process.stdout.write('connection established!');
+  if (lastWritten) {
+    sock.emit('newContent', lastWritten);
+  }
+});
+
+
+function onListening() {
+  if (os.platform() === 'win32') {
+    exec('start /b http://localhost:' + options.port, function(error, stdout, stderr){});
+  } else if (os.platform() === 'darwin') {
+    exec('open -g http://localhost:' + options.port, function(error, stdout, stderr){});
+  } else { // assume unix/linux
+    exec('xdg-open http://localhost:' + options.port, function(error, stdout, stderr){});
+  }
+  readAllInput(process.stdin, function(body) {
+    writeMarkdown(body);
+  });
+  process.stdin.resume();
+}
+
+function onServerError(e) {
+  if (e.code === 'EADDRINUSE') {
+    readAllInput(process.stdin, function(body) {
+      // Forward to existing instant-markdown-d server.
+      require('http').request({
+        hostname: 'localhost',
+        port: options.port,
+        path: '/',
+        method: 'PUT',
+      }).end(body);
+    });
+    process.stdin.resume();
+    return;
+  }
+
+  // Another unexpected error. Raise it again.
+  throw e;
+}
