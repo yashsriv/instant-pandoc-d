@@ -1,0 +1,36 @@
+{
+  "name": "instant-pandoc-d",
+  "version": "0.0.1",
+  "description": "Instant Preview Pandoc Server",
+  "main": "instant-pandoc-d",
+  "engine": "node",
+  "preferGlobal": "true",
+  "bin": {
+    "instant-pandoc-d": "./instant-pandoc-d"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yashsriv/instant-pandoc-d.git"
+  },
+  "keywords": [
+    "pandoc",
+    "live",
+    "preview"
+  ],
+  "author": "Yash Srivastav <admin@yashsriv.org>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yashsriv/instant-pandoc-d/issues"
+  },
+  "homepage": "https://github.com/yashsriv/instant-pandoc-d#readme",
+  "dependencies": {
+    "command-line-args": "^3.0.3",
+    "github-markdown-css": "^2.4.1",
+    "node-pandoc": "^0.2.0",
+    "send": "^0.14.1",
+    "socket.io": "^1.5.1"
+  }
+}
