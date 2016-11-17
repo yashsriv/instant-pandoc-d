@@ -1,6 +1,6 @@
 {
   "name": "instant-pandoc-d",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Instant Preview Pandoc Server",
   "main": "instant-pandoc-d",
   "engine": "node",
