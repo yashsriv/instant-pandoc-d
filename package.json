@@ -27,7 +27,7 @@
   },
   "homepage": "https://github.com/yashsriv/instant-pandoc-d#readme",
   "dependencies": {
-    "command-line-args": "^3.0.3",
+    "command-line-args": "^4.0.3",
     "github-markdown-css": "^2.4.1",
     "node-pandoc": "github:yashsriv/node-pandoc#fix/large-files",
     "send": "^0.14.1",
