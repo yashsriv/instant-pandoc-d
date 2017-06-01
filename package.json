@@ -31,6 +31,6 @@
     "github-markdown-css": "^2.4.1",
     "node-pandoc": "github:yashsriv/node-pandoc#fix/large-files",
     "send": "^0.14.1",
-    "socket.io": "^1.5.1"
+    "socket.io": "^2.0.2"
   }
 }
